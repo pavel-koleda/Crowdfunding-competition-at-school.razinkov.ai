@@ -1,0 +1,7 @@
+numpy~=2.2.1
+pandas~=2.2.3
+easydict~=1.13
+plotly~=5.24.1
+opencv-python~=4.10.0.84
+tqdm~=4.67.1
+scikit-learn~=1.6.1
