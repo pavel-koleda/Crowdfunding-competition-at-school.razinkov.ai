@@ -17,7 +17,7 @@ def train():
     train_data = dataset('train')
     valid_data = dataset('validation')
     # print(train_data)
-    # print(valid_data)
+    # print(train_data['features'].shape)
     model = LogisticRegression(m=train_data['features'].shape[1], experiment_config=experiment_config)
     model.train(train_data['features'], train_data['targets'], valid_data['features'], valid_data['targets'])
 

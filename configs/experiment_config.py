@@ -30,7 +30,7 @@ experiment_config.load_model_path = os.path.join(
 )
 experiment_config.early_stopping = {'min_delta': 1e-5, 'patience': 500}  # Set to None if no need in early stopping
 experiment_config.params = {
-    'learning_rate': 1e-4, 'num_iterations': 1000, 'reg_coefficient_ridge': 0.01, 'reg_coefficient_lasso': 0.01,
+    'learning_rate': 1e-3, 'num_iterations': 1000, 'reg_coefficient_ridge': 0.01, 'reg_coefficient_lasso': 0.01,
     'reg_type': RegularizationType.ridge.value
 }
 
