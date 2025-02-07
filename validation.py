@@ -4,7 +4,7 @@ import pandas as pd
 
 from configs.data_config import data_config
 from configs.experiment_config import experiment_config
-from dataset.alzheimer_dataset import AlzheimerDataset
+from dataset.crowdfunding_dataset import CrowdfundingDataset
 from model.logistic_regression_model import LogisticRegression
 from utils.common_functions import set_seed, write_file
 from utils.metrics import average_precision_score
@@ -15,7 +15,7 @@ set_seed(experiment_config.seed)
 def validate_hyperparams():
     """Makes hyperparameters validation."""
     # Initialize data
-    dataset = AlzheimerDataset(data_config)
+    dataset = CrowdfundingDataset(data_config)
     train_data = dataset('train')
     valid_data = dataset('validation')
     test_data = dataset('test')

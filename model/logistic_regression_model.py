@@ -14,9 +14,9 @@ from utils.params_logger import ParamsLogger
 class LogisticRegression:
     """A class for implementing and training a logistic regression model using the numpy library."""
 
-    def __init__(self, experiment_config):
+    def __init__(self, m: int, experiment_config):
         self.experiment_config = experiment_config
-
+        self.input_vector_dimension = m
         # Params initialization
         self._init_params()
 
@@ -37,7 +37,7 @@ class LogisticRegression:
             self.activation_function = self.__softmax
             self.output_vector_dimension = data_config.num_classes
 
-        self.input_vector_dimension = data_config.image_size[0] * data_config.image_size[1]
+        
         for param_name, param in self.experiment_config.params.items():
             setattr(self, param_name, param)
 
