@@ -180,6 +180,11 @@ class CrowdfundingDataset:
 
             df = pd.concat([df.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
 
+        df_success = read_dataframe_file(r'dataset\kikstarter_Success_stats.csv')
+        df_dollars = read_dataframe_file(r'dataset\kikstarter_Dollars_stats.csv')
+        df = pd.merge(df, df_success, left_on='category_parent_name', right_on='Category', how='left')
+        df = pd.merge(df, df_dollars, left_on='category_parent_name', right_on='Category', how='left')
+
         # Категориальные фичи
         if set_type == SetType.train:
             self.country = df['country'].unique().tolist()
