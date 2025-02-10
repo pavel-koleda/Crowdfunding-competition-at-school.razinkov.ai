@@ -134,7 +134,7 @@ class CrowdfundingDataset:
             })
 
         df = pd.merge(df, self.agg, on=['category_parent_id', 'bucket'], how='left')
-        df = df.fillna(1)
+        df[['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']] = df[['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']].fillna(1)
         df['val1/val1_mean'] = df['val1'] / df['val1_mean']
         df['val2/val2_mean'] = df['val2'] / df['val2_mean']
         df['val3/val3_mean'] = df['val3'] / df['val3_mean']
@@ -183,7 +183,20 @@ class CrowdfundingDataset:
         df_success = read_dataframe_file(r'dataset\kikstarter_Success_stats.csv')
         df_dollars = read_dataframe_file(r'dataset\kikstarter_Dollars_stats.csv')
         df = pd.merge(df, df_success, left_on='category_parent_name', right_on='Category', how='left')
+        df = df.drop(columns='Category')
         df = pd.merge(df, df_dollars, left_on='category_parent_name', right_on='Category', how='left')
+        df = df.drop(columns='Category')
+
+        if set_type is SetType.train:
+            self.fill_na_dict = dict()
+            for cat in df_success.columns.drop(['Category']):
+                self.fill_na_dict[cat] = df[cat].mean()
+
+            for cat in df_dollars.columns.drop(['Category']):
+                self.fill_na_dict[cat] = df[cat].mean()
+
+        for k, v in self.fill_na_dict.items():
+            df[k] = df[k].fillna(v)
 
         # Категориальные фичи
         if set_type == SetType.train:
@@ -206,7 +219,7 @@ class CrowdfundingDataset:
 
         if set_type is SetType.train:
             df = df[df['year_start'].isin(list(range(2022, 2024 + 1)))]
-
+        # TODO: Убрать static_usd и fx_rate?
         df = df.drop(
             columns=['id', 'blurb', 'created_at', 'currency_symbol', 'deadline', 'launched_at', 'name', 'photo', 'slug',
                      'discover_category_url', 'urls', 'creator', 'creator_id', 'creator_name', 'category_alt_parent_id',
