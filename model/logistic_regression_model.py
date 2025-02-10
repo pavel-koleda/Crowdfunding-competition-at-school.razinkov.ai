@@ -389,7 +389,21 @@ class LogisticRegression:
         loss_valid_previous, start_stopping = 0, 0
 
         for iteration in pbar:
-            loss_train, model_confidence_train = self.__gradient_descent_step(inputs_train, targets_train_loss)
+            loss_train = []
+
+            model_confidence_train = np.zeros((self.output_vector_dimension, num_samples))
+            num_samples = inputs_train.shape[0]
+            indices = np.arange(num_samples)
+            np.random.shuffle(indices)
+
+            for i in range(0, num_samples, self.batch_size):
+                batch_indices = indices[i:i + self.batch_size]
+                loss_train_part, model_confidence_train_part = self.__gradient_descent_step(inputs_train[batch_indices],
+                                                                                  targets_train_loss[batch_indices])
+                loss_train.append(loss_train_part * batch_indices.shape[0])
+                model_confidence_train[:, batch_indices] = model_confidence_train_part
+            loss_train = np.sum(loss_train) / inputs_train.shape[0]
+
             ap_train = self.compute_metrics(inputs_train, targets_train, model_confidence_train)
 
             loss_valid = self.__target_function_value(inputs_valid, targets_valid_loss)

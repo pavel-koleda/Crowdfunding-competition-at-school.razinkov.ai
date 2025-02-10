@@ -28,9 +28,13 @@ experiment_config.load_model_epoch = None
 experiment_config.load_model_path = os.path.join(
     experiment_config.checkpoints_dir, f'checkpoint_{experiment_config.load_model_epoch}.pickle'
 )
-experiment_config.early_stopping = {'min_delta': 1e-5, 'patience': 500}  # Set to None if no need in early stopping
+experiment_config.early_stopping = {'min_delta': 1e-5, 'patience': 200}  # Set to None if no need in early stopping
 experiment_config.params = {
-    'learning_rate': 1e-3, 'num_iterations': 2000, 'reg_coefficient_ridge': 0.01, 'reg_coefficient_lasso': 0.01,
+    'learning_rate': 1e-3,
+    'num_iterations': 200,
+    'reg_coefficient_ridge': 0.01,
+    'reg_coefficient_lasso': 0.01,
+    'batch_size': 256,
     'reg_type': RegularizationType.ridge.value
 }
 
