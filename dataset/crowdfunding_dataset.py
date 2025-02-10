@@ -141,6 +141,9 @@ class CrowdfundingDataset:
         df['val4/val4_mean'] = df['val4'] / df['val4_mean']
 
         # Авторы
+        creator_counts = df['creator_id'].value_counts()
+        df['user_frequency'] = df['creator_id'].map(creator_counts)
+
         if set_type is SetType.train:
             self.authors_project_history = AuthorsProjectsHistory()
             self.authors_project_history.fit(df)
