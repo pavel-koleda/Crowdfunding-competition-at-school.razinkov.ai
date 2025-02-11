@@ -99,11 +99,17 @@ class CrowdfundingDataset:
         df['category_parent_id'] = df['category_parent_id'].fillna(9999)
 
         # Признаки времени
-        df['duration_ld'] = (df['deadline'] - df['launched_at']).dt.total_seconds()
-        df['duration_cl'] = (df['launched_at'] - df['created_at']).dt.total_seconds()
+        df['duration_ld'] = (df['deadline'] - df['launched_at']).dt.total_seconds() / 60 / 60 / 24
+        df['duration_cl'] = (df['launched_at'] - df['created_at']).dt.total_seconds() / 60 / 60 / 24
 
         df['duration_cl_log'] = np.log(df['duration_cl'] + 1)
-        df['duration_cl'] = np.clip(df['duration_cl'], 0, 60 * 60 * 24 * 100)
+        df['duration_cl'] = np.clip(df['duration_cl'], 0, 100)
+
+        df['duration_cl ** 2'] = df['duration_cl'] ** 2
+        df['duration_cl ** 3'] = df['duration_cl'] ** 3
+        df['duration_ld ** 2'] = df['duration_ld'] ** 2
+        df['duration_ld ** 3'] = df['duration_ld'] ** 3
+        df['duration_ld sqrt'] = df['duration_ld'] ** (1 / 2)
 
         df['launched_at_sin'] = np.sin(2 * np.pi * df['launched_at'].dt.dayofyear / 365)
         df['launched_at_cos'] = np.cos(2 * np.pi * df['launched_at'].dt.dayofyear / 365)
@@ -111,10 +117,30 @@ class CrowdfundingDataset:
         df['deadline_cos'] = np.cos(2 * np.pi * df['deadline'].dt.dayofyear / 365)
 
         # Валюта
+        df['goal_very_high'] = pd.Categorical((df['goal'] > 10_000_000).astype(int))
+        df['goal_very_low'] = pd.Categorical((df['goal'] < 100).astype(int))
         df['val1'] = df['goal'] / df['fx_rate']
         df['val2'] = df['goal'] / df['static_usd_rate']
         df['val3'] = df['goal'] * df['fx_rate']
-        df['val4'] = df['goal'] * df['fx_rate']
+        df['val4'] = df['goal'] * df['static_usd_rate']
+
+        df['goal ** 2'] = (df['goal'] / 1000) ** 2
+        df['val1 ** 2'] = (df['val1'] / 1000) ** 2
+        df['val2 ** 2'] = (df['val2'] / 1000) ** 2
+        df['val3 ** 2'] = (df['val3'] / 1000) ** 2
+        df['val4 ** 2'] = (df['val4'] / 1000) ** 2
+
+        df['sqrt goal'] = df['goal'] ** 0.5
+        df['sqrt val1'] = df['val1'] ** 0.5
+        df['sqrt val2'] = df['val2'] ** 0.5
+        df['sqrt val3'] = df['val3'] ** 0.5
+        df['sqrt val4'] = df['val4'] ** 0.5
+
+        df['log goal'] = np.log(df['goal'] + 1)
+        df['log val1'] = np.log(df['val1'] + 1)
+        df['log val2'] = np.log(df['val2'] + 1)
+        df['log val3'] = np.log(df['val3'] + 1)
+        df['log val4'] = np.log(df['val4'] + 1)
 
         df['bucket'] = df['deadline'].apply(lambda x: date_to_bucket(x, 2009, 3))
         tmp = df[['category_parent_id', 'bucket', 'val1', 'val2', 'val3', 'val4']].copy()
@@ -156,6 +182,7 @@ class CrowdfundingDataset:
 
         # Тексты
         df['blurb'] = df['name'] + " " + df['blurb']
+        df['text_len'] = df['blurb'].apply(len)
         if set_type is SetType.train:
             df['blurb'] = df['blurb'].str.lower().str.replace(r'[^\w\s]', '', regex=True)
 
@@ -182,10 +209,15 @@ class CrowdfundingDataset:
 
         df_success = read_dataframe_file(r'dataset\kikstarter_Success_stats.csv')
         df_dollars = read_dataframe_file(r'dataset\kikstarter_Dollars_stats.csv')
+        weo_data = pd.read_csv('dataset/weo_data.csv')
         df = pd.merge(df, df_success, left_on='category_parent_name', right_on='Category', how='left')
         df = df.drop(columns='Category')
         df = pd.merge(df, df_dollars, left_on='category_parent_name', right_on='Category', how='left')
         df = df.drop(columns='Category')
+
+        df['year_start'] = df['created_at'].dt.year
+        df = pd.merge(df, weo_data, left_on=['year_start', 'country'], right_on=['year', 'country'], how='left')
+        df = df.drop(columns='year')
 
         if set_type is SetType.train:
             self.fill_na_dict = dict()
@@ -193,6 +225,10 @@ class CrowdfundingDataset:
                 self.fill_na_dict[cat] = df[cat].mean()
 
             for cat in df_dollars.columns.drop(['Category']):
+                self.fill_na_dict[cat] = df[cat].mean()
+
+            for cat in ['Employment', 'General government net debt', 'General government primary net lending/borrowing',
+                        'Output gap in percent of potential GDP']:
                 self.fill_na_dict[cat] = df[cat].mean()
 
         for k, v in self.fill_na_dict.items():
@@ -205,7 +241,7 @@ class CrowdfundingDataset:
             self.category_id = df['category_id'].unique().tolist()
             self.category_parent_id = df['category_parent_id'].unique().tolist()
             self.month_start = df['created_at'].dt.month.unique().tolist()
-            self.year_start = df['created_at'].dt.year.unique().tolist()
+            self.year_start = df['year_start'].unique().tolist()
             self.location_type = df['location_type'].unique().tolist()
 
         df['country'] = pd.Categorical(df['country'], categories=self.country, ordered=False)
@@ -214,7 +250,7 @@ class CrowdfundingDataset:
         df['category_parent_id'] = pd.Categorical(df['category_parent_id'], categories=self.category_parent_id,
                                                   ordered=False)
         df['month_start'] = pd.Categorical(df['created_at'].dt.month, categories=self.month_start, ordered=False)
-        df['year_start'] = pd.Categorical(df['created_at'].dt.year, categories=self.year_start, ordered=True)
+        df['year_start'] = pd.Categorical(df['year_start'], categories=self.year_start, ordered=True)
         df['location_type'] = pd.Categorical(df['location_type'], categories=self.location_type, ordered=False)
 
         if set_type is SetType.train:
@@ -231,7 +267,6 @@ class CrowdfundingDataset:
                      ])
         df = pd.get_dummies(df)
 
-        # TODO: Не делать препроцессинг для OHE фич?
         if set_type is SetType.train:
             features = self.preprocessing.train(df.drop(columns=['state']).to_numpy(dtype=np.float32))
         elif set_type is SetType.validation:

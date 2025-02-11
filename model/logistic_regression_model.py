@@ -387,12 +387,12 @@ class LogisticRegression:
         pbar = tqdm(np.arange(self.start_iteration, self.num_iterations))
         ap_valid_best = self.compute_metrics(inputs_valid, targets_valid)
         loss_valid_previous, start_stopping = 0, 0
+        num_samples = inputs_train.shape[0]
 
         for iteration in pbar:
             loss_train = []
 
             model_confidence_train = np.zeros((self.output_vector_dimension, num_samples))
-            num_samples = inputs_train.shape[0]
             indices = np.arange(num_samples)
             np.random.shuffle(indices)
 

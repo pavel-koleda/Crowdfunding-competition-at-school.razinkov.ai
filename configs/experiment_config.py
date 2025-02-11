@@ -31,7 +31,7 @@ experiment_config.load_model_path = os.path.join(
 experiment_config.early_stopping = {'min_delta': 1e-5, 'patience': 200}  # Set to None if no need in early stopping
 experiment_config.params = {
     'learning_rate': 1e-3,
-    'num_iterations': 200,
+    'num_iterations': 1000,
     'reg_coefficient_ridge': 0.01,
     'reg_coefficient_lasso': 0.01,
     'batch_size': 256,
