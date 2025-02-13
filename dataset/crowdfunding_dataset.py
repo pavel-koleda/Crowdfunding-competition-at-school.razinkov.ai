@@ -5,21 +5,18 @@ import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import AgglomerativeClustering
 
 from utils.common_functions import read_dataframe_file
 from utils.enums import SetType
 from utils.preprocessing import Preprocessing
 
 
-class AuthorsProjectsHistory:
+class AuthorPerformanceTracker:
 
     def __init__(self):
         self.history = defaultdict(list)
 
     def fit(self, df):
-        # Логика с iterrows работает ооочень медленно, но вроде терпимо
         for index, row in df.sort_values(by=['deadline']).reset_index(drop=True).iterrows():
             author_id = row['creator_id']
             result = row['state']
@@ -32,7 +29,7 @@ class AuthorsProjectsHistory:
         fail_results = []
         for index, row in df.sort_values(by=['deadline']).reset_index(drop=True).iterrows():
             author_id = row['creator_id']
-            deadline_ts = row['deadline']  # TODO: мб тут брать старт?
+            deadline_ts = row['deadline']
             author_history = self.history[author_id]
 
             succeed, failed = 0, 0
@@ -45,6 +42,40 @@ class AuthorsProjectsHistory:
             suc_results.append(succeed)
             fail_results.append(failed)
         return np.array(fail_results), np.array(suc_results)
+
+
+class TF:
+
+    def __init__(self, max_vocab, min_df, max_df, ngram_range=(2, 5)):
+        self.max_vocab = max_vocab
+        self.min_df = min_df
+        self.max_df = max_df
+        self.ngram_range = ngram_range
+
+    def fit(self, texts):
+        df = defaultdict(set)
+        tf = defaultdict(int)
+        for n_gram in range(self.ngram_range[0], self.ngram_range[1] + 1):
+            for text_id, text in enumerate(texts):
+                for i in range(len(text) - n_gram + 1):
+                    df[text[i:i + n_gram]].add(text_id)
+                    tf[text[i:i + n_gram]] += 1
+        df = {k: len(df[k]) / len(texts) for k in df.keys()}
+        filtered_tf = {k: v for k, v in tf.items() if self.min_df < df[k] < self.max_df}
+        self.vocab = defaultdict(int, {t[0]: i for i, t in enumerate(
+            sorted(filtered_tf.items(), key=lambda x: x[1], reverse=True)[:self.max_vocab])})
+        return self
+
+    def transform(self, texts):
+        results = []
+        for text in texts:
+            result = np.zeros(len(self.vocab))
+            for n_gram in range(self.ngram_range[0], self.ngram_range[1] + 1):
+                for i in range(len(text) - n_gram + 1):
+                    if text[i:i + n_gram] in self.vocab:
+                        result[self.vocab[text[i:i + n_gram]]] += 1
+            results.append(result)
+        return np.stack(results)
 
 
 def date_to_bucket(date, min_year, window_size):
@@ -94,7 +125,7 @@ class CrowdfundingDataset:
         l.columns = [f'location_{x}' for x in l.columns]
         df = pd.concat([df, l], axis=1).drop(columns=['location'])
 
-        # Удаление пропусков
+        # Заполнение пропусков
         df['location_type'] = df['location_type'].fillna('Unknown')
         df['category_parent_id'] = df['category_parent_id'].fillna(9999)
 
@@ -160,7 +191,8 @@ class CrowdfundingDataset:
             })
 
         df = pd.merge(df, self.agg, on=['category_parent_id', 'bucket'], how='left')
-        df[['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']] = df[['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']].fillna(1)
+        df[['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']] = df[
+            ['val1_mean', 'val2_mean', 'val3_mean', 'val4_mean']].fillna(1)
         df['val1/val1_mean'] = df['val1'] / df['val1_mean']
         df['val2/val2_mean'] = df['val2'] / df['val2_mean']
         df['val3/val3_mean'] = df['val3'] / df['val3_mean']
@@ -171,9 +203,9 @@ class CrowdfundingDataset:
         df['user_frequency'] = df['creator_id'].map(creator_counts)
 
         if set_type is SetType.train:
-            self.authors_project_history = AuthorsProjectsHistory()
-            self.authors_project_history.fit(df)
-        failed_results, succeed_results = self.authors_project_history.transform(df)
+            self.author_performance_tracker = AuthorPerformanceTracker()
+            self.author_performance_tracker.fit(df)
+        failed_results, succeed_results = self.author_performance_tracker.transform(df)
         df['author_succeed_results'] = succeed_results
         df['author_failed_results'] = failed_results
         df['author_succeed_ratio'] = (df['author_succeed_results'] + 1) / (
@@ -186,26 +218,26 @@ class CrowdfundingDataset:
         if set_type is SetType.train:
             df['blurb'] = df['blurb'].str.lower().str.replace(r'[^\w\s]', '', regex=True)
 
-            vectorizer = TfidfVectorizer(
-                analyzer='char_wb',
+            vectorizer = TF(
                 ngram_range=(2, 5),
-                max_features=200,
+                max_vocab=200,
                 max_df=0.98,
                 min_df=0.015,
             )
 
-            tfidf_matrix = vectorizer.fit_transform(df['blurb'])
+            vectorizer.fit(df['blurb'])
+            tf_matrix = vectorizer.transform(df['blurb'])
 
-            tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
+            tf_df = pd.DataFrame(tf_matrix)
 
-            df = pd.concat([df.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
+            df = pd.concat([df.reset_index(drop=True), tf_df.reset_index(drop=True)], axis=1)
             self.vectorizer = vectorizer
         else:
-            tfidf_matrix = self.vectorizer.transform(df['blurb'])
+            tf_matrix = self.vectorizer.transform(df['blurb'])
 
-            tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=self.vectorizer.get_feature_names_out())
+            tf_df = pd.DataFrame(tf_matrix)
 
-            df = pd.concat([df.reset_index(drop=True), tfidf_df.reset_index(drop=True)], axis=1)
+            df = pd.concat([df.reset_index(drop=True), tf_df.reset_index(drop=True)], axis=1)
 
         df_success = read_dataframe_file(r'dataset\kikstarter_Success_stats.csv')
         df_dollars = read_dataframe_file(r'dataset\kikstarter_Dollars_stats.csv')
@@ -255,7 +287,6 @@ class CrowdfundingDataset:
 
         if set_type is SetType.train:
             df = df[df['year_start'].isin(list(range(2022, 2024 + 1)))]
-        # TODO: Убрать static_usd и fx_rate?
         df = df.drop(
             columns=['id', 'blurb', 'created_at', 'currency_symbol', 'deadline', 'launched_at', 'name', 'photo', 'slug',
                      'discover_category_url', 'urls', 'creator', 'creator_id', 'creator_name', 'category_alt_parent_id',
